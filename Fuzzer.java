@@ -20,14 +20,15 @@ public class Fuzzer {
             throw new RuntimeException("Could not find command '%s'.".formatted(commandToFuzz));
         }
 
-        String seedInput = "<html a=\"value\">...</html>";
+        String seedInput = "<!DOCTYPE html>\n<html>\n\t<body>\n\t\t<h5>A simple html page!<h5>\n\t\t<a href \"https://youtu.be/dQw4w9WgXcQ?si=VlUh43Ag7CVSVUCc\">funny cat videos</a><br/>\n\t\t<button onClick \"doSomething()\">do something</button>\n\t</body>\n\t<script>\n\t\tfunction doSomething()\n\t\t{\n\t\t\talert(\"I did something!\");\n\t\t}\n\t</script>\n</html>";
 
         ProcessBuilder builder = getProcessBuilderForCommand(commandToFuzz, workingDirectory);
         System.out.printf("Command: %s\n", builder.command());
 
         runCommand(builder, seedInput, getMutatedInputs(seedInput, List.of(
-                input -> input.replace("<html", "a"), // this is just a placeholder, mutators should not only do hard-coded string replacement
-                input -> input.replace("<html", "")
+                input -> List.of(input.replace("<html", "a")), // this is just a placeholder, mutators should not only do hard-coded string replacement
+                input -> List.of(input.replace("<html", "")),
+				input -> List.of(input.replace("=", " "))
         )));
     }
 
@@ -46,7 +47,24 @@ public class Fuzzer {
 
     private static void runCommand(ProcessBuilder builder, String seedInput, List<String> mutatedInputs) {
         Stream.concat(Stream.of(seedInput), mutatedInputs.stream()).forEach(
-                input -> { }
+                input -> {
+					System.out.println("input: " + input);
+					try
+					{
+						Process process = builder.start();
+						OutputStream processOut = process.getOutputStream();
+						processOut.write(input.getBytes());
+						processOut.flush();
+						processOut.close();
+						int exitcode = process.waitFor();
+						System.out.println("exitcode: " + exitcode);
+					}
+					catch(IOException | InterruptedException e)
+					{
+						System.out.println("exception: " + e.getMessage());
+						System.out.println("stacktrace:\n" + e.getStackTrace().toString());
+					}
+				}
         );
     }
 
@@ -57,7 +75,7 @@ public class Fuzzer {
                 .collect(Collectors.joining());
     }
 
-    private static List<String> getMutatedInputs(String seedInput, Collection<Function<String, String>> mutators) {
-        return List.of();
+    private static List<String> getMutatedInputs(String seedInput, Collection<Function<String, List<String>>> mutators) {
+        return mutators.stream().map(mutator -> mutator.apply(seedInput)).flatMap(List::stream).collect(Collectors.toList());
     }
 }
