@@ -1,0 +1,7 @@
+name: Fuzzer
+on: push
+jobs:
+  fuzzing:
+    runs-on: ubuntu-latest
+    steps:
+      - run: java Fuzzer.java "./html_parser_linux_x86_64"
